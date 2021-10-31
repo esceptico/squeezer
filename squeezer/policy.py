@@ -5,13 +5,13 @@ import torch
 from torch import nn
 
 
-LossDictT = Dict[str, float]
+ValuesDictT = Dict[str, float]
 
 
 class AbstractDistillationPolicy(ABC, nn.Module):
     """Abstract class for all distillation policies.
     """
-    def forward(self, teacher_output, student_output, batch, epoch: int) -> Tuple[torch.Tensor, LossDictT]:
+    def forward(self, teacher_output, student_output, batch, epoch: int) -> Tuple[torch.Tensor, ValuesDictT]:
         """Forward method.
 
         Args:
@@ -21,7 +21,6 @@ class AbstractDistillationPolicy(ABC, nn.Module):
             epoch: Number of epoch.
 
         Returns:
-            Tuple of overall loss tensor and dictionary of sub-loss values.
-            Overall loss must support autograd, i.e. requires_grad=True.
+            Tuple that contains loss tensor and values to log.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
