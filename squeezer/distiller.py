@@ -1,7 +1,7 @@
 import os
 import sys
 from collections import defaultdict
-from typing import Callable, Dict, Optional, TypeVar, Union
+from typing import Optional, TypeVar, Union
 
 import torch
 from torch import nn
@@ -12,7 +12,6 @@ from squeezer.policy import AbstractDistillationPolicy
 from squeezer.utils import move_to_device
 
 
-MetricT = Callable[[torch.Tensor, torch.Tensor], float]
 BatchT = TypeVar('BatchT')
 
 
@@ -30,7 +29,6 @@ class Distiller:
         teacher: nn.Module,
         student: nn.Module,
         loss_policy: AbstractDistillationPolicy,
-        metrics: Optional[Dict[str, MetricT]] = None,
         device: Union[str, torch.device] = 'cpu',
         optimizer=None,
     ):
@@ -38,7 +36,6 @@ class Distiller:
         self.teacher = teacher.to(device)
         self.student = student.to(device)
         self.loss_policy = loss_policy
-        self.metrics = metrics
         self.optimizer = optimizer
         if self.optimizer is None:
             self.optimizer = torch.optim.AdamW(student.parameters(), lr=1e-4)
