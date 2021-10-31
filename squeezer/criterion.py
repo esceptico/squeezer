@@ -58,17 +58,17 @@ def kld_loss(
     return distillation_loss_scaled
 
 
-def cosine_similarity_loss(
-    teacher_hidden: torch.Tensor,
-    student_hidden: torch.Tensor
-) -> torch.Tensor:
-    # TODO: refactor
-    bs, seq, dim = student_hidden.size()
-    target = student_hidden.new_ones(bs*seq)
-    teacher_hidden = teacher_hidden.view(bs*seq, -1).clone()
-    return func.cosine_embedding_loss(
-        teacher_hidden,
-        student_hidden.contiguous().view(-1, dim),
-        target,
-        reduction='mean'
-    )
+def cosine_loss(x1: Tensor, x2: Tensor) -> Tensor:
+    """Cosine distance loss calculated on last dimension.
+
+    Args:
+        x1: First input.
+        x2: Second input (of size matching x1).
+
+    Returns:
+        Averaged cosine distance between x1 and x2.
+    """
+    distance = 1 - func.cosine_similarity(x1, x2, dim=-1)
+    mean_distance = distance.mean()
+    return mean_distance
+
