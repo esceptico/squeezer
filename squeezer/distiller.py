@@ -23,22 +23,35 @@ BatchT = TypeVar('BatchT')
 # 5. logging
 # 6. scheduler
 class Distiller:
-    """Base class for distiller."""
+    """Base class for distiller.
+
+    Notes:
+        You must implement teacher_forward and student_forward methods
+        in the child class.
+    """
     def __init__(
         self,
         teacher: nn.Module,
         student: nn.Module,
         loss_policy: AbstractDistillationPolicy,
-        device: Union[str, torch.device] = 'cpu',
-        optimizer=None,
+        optimizer: torch.optim.Optimizer,
+        device: Union[str, torch.device] = 'cpu'
     ):
+        """Constructor.
+
+        Args:
+            teacher: Teacher model.
+            student: Student model.
+            optimizer: Optimizer.
+            loss_policy: Distillation loss policy.
+            device: Device to which you want to move data and models.
+                Defaults to cpu.
+        """
         self.device = device
         self.teacher = teacher.to(device)
         self.student = student.to(device)
         self.loss_policy = loss_policy
         self.optimizer = optimizer
-        if self.optimizer is None:
-            self.optimizer = torch.optim.AdamW(student.parameters(), lr=1e-4)
 
     def __call__(self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None, n_epochs: int = 10):
         self.teacher.eval()
