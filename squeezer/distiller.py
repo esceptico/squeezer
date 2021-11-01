@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from squeezer.policy import AbstractDistillationPolicy
-from squeezer.utils import move_to_device
+from squeezer.utils import move_to_device, save_weights
 
 
 BatchT = TypeVar('BatchT')
@@ -147,15 +147,18 @@ class Distiller:
 
     def save(self, save_path: str):
         """Saves weights (student, optimizer and loss policy) to the given directory."""
-        torch.save(self.student.state_dict(), os.path.join(save_path, 'student.pth'))
-        torch.save(self.optimizer.state_dict(), os.path.join(save_path, 'optimizer.pth'))
-        torch.save(self.loss_policy.state_dict(), os.path.join(save_path, 'loss_policy.pth'))
+        save_weights(self.student, os.path.join(save_path, 'student.pth'))
+        save_weights(self.optimizer, os.path.join(save_path, 'optimizer.pth'))
+        save_weights(self.loss_policy, os.path.join(save_path, 'loss_policy.pth'))
 
     def load(self, load_path: str, device: Union[str, torch.device] = 'cpu'):
-        """Loads weights (student, optimizer and loss policy) from the given directory."""
-        student_state_dict = torch.load(os.path.join(load_path, 'student.pth', device))
-        self.student.load_state_dict(student_state_dict)
-        optimizer_state_dict = torch.load(os.path.join(load_path, 'optimizer.pth', device))
-        self.optimizer.load_state_dict(optimizer_state_dict)
-        loss_policy_state_dict = torch.load(os.path.join(load_path, 'loss_policy.pth', device))
-        self.loss_policy.load_state_dict(loss_policy_state_dict)
+        """Loads weights (student, optimizer and loss policy if exists) from the given directory."""
+        paths = [
+            (self.student, os.path.join(load_path, 'student.pth')),
+            (self.optimizer, os.path.join(load_path, 'optimizer.pth')),
+            (self.loss_policy, os.path.join(load_path, 'loss_policy.pth'))
+        ]
+        for module, path in paths:
+            if os.path.exists(path):
+                parameters = torch.load(path, device)
+                module.load_state_dict(parameters)
