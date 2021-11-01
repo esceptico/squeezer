@@ -8,6 +8,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from squeezer.logging import TensorboardLogger
 from squeezer.policy import AbstractDistillationPolicy
 from squeezer.utils import move_to_device, save_weights
 
@@ -35,7 +36,9 @@ class Distiller:
         student: nn.Module,
         loss_policy: AbstractDistillationPolicy,
         optimizer: torch.optim.Optimizer,
-        device: Union[str, torch.device] = 'cpu'
+        device: Union[str, torch.device] = 'cpu',
+        log_dir: str = 'runs',
+        name: Optional[str] = None
     ):
         """Constructor.
 
@@ -46,12 +49,18 @@ class Distiller:
             loss_policy: Distillation loss policy.
             device: Device to which you want to move data and models.
                 Defaults to cpu.
+            log_dir: Path to save logs.
+            name: Experiment name.
         """
         self.device = device
         self.teacher = teacher.to(device)
         self.student = student.to(device)
         self.loss_policy = loss_policy
         self.optimizer = optimizer
+
+        self.log_dir = log_dir
+        self.name = name
+        self.logger = TensorboardLogger(self.log_dir, self.name)
 
     def __call__(self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None, n_epochs: int = 10):
         self.teacher.eval()
@@ -63,6 +72,8 @@ class Distiller:
                     self._validate(val_loader, epoch)
             except InterruptedError:
                 print('Keyboard interrupt...')
+            finally:
+                self.logger.dispose()
 
     def move_batch_to_device(self, batch: BatchT) -> BatchT:
         return move_to_device(batch, self.device)
@@ -100,9 +111,11 @@ class Distiller:
     def _train(self, loader: DataLoader, epoch: int):
         self.student.train()
         loss_dict = defaultdict(float)
+        running_loss = 0.
 
-        loader_bar = tqdm(loader, desc=f'Train [{epoch}th epoch]', leave=False, file=sys.stdout)
-        for batch in loader_bar:
+        bar_desc = f'[{epoch}th epoch]'
+        loader_bar = tqdm(loader, desc=bar_desc, leave=True, file=sys.stdout)
+        for i, batch in enumerate(loader_bar):
             batch = self.move_batch_to_device(batch)
             self.optimizer.zero_grad()
             with torch.no_grad():
@@ -116,11 +129,13 @@ class Distiller:
             )
             for loss_name, loss_value in batch_loss_dict.items():
                 loss_dict[loss_name] += loss_value
+
+            running_loss += batch_loss.item()
+            loader_bar.set_postfix({'loss': running_loss / (i + 1)})
             batch_loss.backward()
             self.optimizer.step()
-        loss_dict = {k: v / len(loader) for k, v in loss_dict.items()}
-        report = '   '.join(f'{k}={v:.5f}' for k, v in loss_dict.items())
-        print(f'[Train] Epoch {epoch}: {report:>15}')
+        loss_dict = {f'Train/{k}': v / len(loader) for k, v in loss_dict.items()}
+        self.logger.log_dict(loss_dict, step=epoch)
 
     @torch.no_grad()
     def _validate(self, loader: DataLoader, epoch: int):
@@ -140,10 +155,8 @@ class Distiller:
             )
             for loss_name, loss_value in batch_loss_dict.items():
                 loss_dict[loss_name] += loss_value
-        loss_dict = {k: v / len(loader) for k, v in loss_dict.items()}
-        report = '   '.join(f'{k}={v:.5f}' for k, v in loss_dict.items())
-        spacing = (2 + len(str(epoch))) * ' '
-        print(f'[Validation]: {spacing}{report:>15}')
+        loss_dict = {f'Val/{k}': v / len(loader) for k, v in loss_dict.items()}
+        self.logger.log_dict(loss_dict, step=epoch)
 
     def save(self, save_path: str):
         """Saves weights (student, optimizer and loss policy) to the given directory."""
