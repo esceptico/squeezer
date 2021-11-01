@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from squeezer.logging import TensorboardLogger
 from squeezer.policy import AbstractDistillationPolicy
-from squeezer.utils import move_to_device, save_weights
+from squeezer.utils import Average, DictAverage, move_to_device, save_weights
 
 
 BatchT = TypeVar('BatchT')
@@ -110,8 +110,9 @@ class Distiller:
 
     def _train(self, loader: DataLoader, epoch: int):
         self.student.train()
-        loss_dict = defaultdict(float)
-        running_loss = 0.
+
+        loss_average = Average()
+        average = DictAverage()
 
         bar_desc = f'[{epoch}th epoch]'
         loader_bar = tqdm(loader, desc=bar_desc, leave=True, file=sys.stdout)
@@ -127,35 +128,37 @@ class Distiller:
                 batch=batch,
                 epoch=epoch
             )
-            for loss_name, loss_value in batch_loss_dict.items():
-                loss_dict[loss_name] += loss_value
-
-            running_loss += batch_loss.item()
-            loader_bar.set_postfix({'loss': running_loss / (i + 1)})
             batch_loss.backward()
             self.optimizer.step()
-        loss_dict = {f'Train/{k}': v / len(loader) for k, v in loss_dict.items()}
+
+            loss_average.update(batch_loss.item())
+            average.update(batch_loss_dict)
+            loader_bar.set_postfix({'loss': loss_average.compute()})
+        loss_dict = {f'Train/{k}': v for k, v in average.compute().items()}
         self.logger.log_dict(loss_dict, step=epoch)
 
     @torch.no_grad()
     def _validate(self, loader: DataLoader, epoch: int):
         self.student.train()
-        loss_dict = defaultdict(float)
 
-        loader_bar = tqdm(loader, desc=f'Validation', leave=False, file=sys.stdout)
+        loss_average = Average()
+        average = DictAverage()
+
+        loader_bar = tqdm(loader, desc=f'Validation', leave=True, file=sys.stdout)
         for batch in loader_bar:
             batch = self.move_batch_to_device(batch)
             teacher_output = self.teacher_forward(batch)
             student_output = self.student_forward(batch)
-            _, batch_loss_dict = self.loss_policy(
+            batch_loss, batch_loss_dict = self.loss_policy(
                 teacher_output=teacher_output,
                 student_output=student_output,
                 batch=batch,
                 epoch=epoch
             )
-            for loss_name, loss_value in batch_loss_dict.items():
-                loss_dict[loss_name] += loss_value
-        loss_dict = {f'Val/{k}': v / len(loader) for k, v in loss_dict.items()}
+            loss_average.update(batch_loss.item())
+            average.update(batch_loss_dict)
+            loader_bar.set_postfix({'loss': loss_average.compute()})
+        loss_dict = {f'Val/{k}': v for k, v in average.compute().items()}
         self.logger.log_dict(loss_dict, step=epoch)
 
     def save(self, save_path: str):
