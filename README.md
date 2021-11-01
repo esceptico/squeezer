@@ -5,7 +5,7 @@
 Implement `teacher_forward`, `student_forward` 
 and (if required) `move_batch_to_device` methods.
 ```python
-from squeezer.distiller import Distiller
+from squeezer import Distiller
 
 
 class CustomDistiller(Distiller):
@@ -19,7 +19,7 @@ class CustomDistiller(Distiller):
 ```python
 from torch.nn.functional import mse_loss
 
-from squeezer.policy import AbstractDistillationPolicy
+from squeezer import AbstractDistillationPolicy
 
 
 class DistillationPolicy(AbstractDistillationPolicy):
