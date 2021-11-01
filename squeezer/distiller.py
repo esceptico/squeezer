@@ -102,7 +102,7 @@ class Distiller:
         loss_dict = defaultdict(float)
 
         loader_bar = tqdm(loader, desc=f'Train [{epoch}th epoch]', leave=False, file=sys.stdout)
-        for i, batch in enumerate(loader_bar):
+        for batch in loader_bar:
             batch = self.move_batch_to_device(batch)
             self.optimizer.zero_grad()
             with torch.no_grad():
@@ -118,17 +118,16 @@ class Distiller:
                 loss_dict[loss_name] += loss_value
             batch_loss.backward()
             self.optimizer.step()
-
-            loss_dict = {k: v / (i + 1) for k, v in loss_dict.items()}
+        loss_dict = {k: v / len(loader) for k, v in loss_dict.items()}
         report = '   '.join(f'{k}={v:.5f}' for k, v in loss_dict.items())
-        print(f'Epoch {epoch}: {report}')
+        print(f'[Train] Epoch {epoch}: {report:>15}')
 
     @torch.no_grad()
     def _validate(self, loader: DataLoader, epoch: int):
         self.student.train()
         loss_dict = defaultdict(float)
 
-        loader_bar = tqdm(loader)
+        loader_bar = tqdm(loader, desc=f'Validation', leave=False, file=sys.stdout)
         for batch in loader_bar:
             batch = self.move_batch_to_device(batch)
             teacher_output = self.teacher_forward(batch)
@@ -143,7 +142,8 @@ class Distiller:
                 loss_dict[loss_name] += loss_value
         loss_dict = {k: v / len(loader) for k, v in loss_dict.items()}
         report = '   '.join(f'{k}={v:.5f}' for k, v in loss_dict.items())
-        print(f'Epoch {epoch}: {report}')
+        spacing = (2 + len(str(epoch))) * ' '
+        print(f'[Validation]: {spacing}{report:>15}')
 
     def save(self, save_path: str):
         """Saves weights (student, optimizer and loss policy) to the given directory."""
