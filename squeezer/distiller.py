@@ -1,6 +1,5 @@
 import os
 import sys
-from collections import defaultdict
 from typing import Optional, TypeVar, Union
 
 import torch
@@ -10,7 +9,8 @@ from tqdm import tqdm
 
 from squeezer.logging import TensorboardLogger
 from squeezer.policy import AbstractDistillationPolicy
-from squeezer.utils import Average, DictAverage, move_to_device, save_weights
+from squeezer.reduce import Average, DictAverage
+from squeezer.utils import move_to_device, save_weights
 
 
 BatchT = TypeVar('BatchT')
@@ -19,10 +19,8 @@ BatchT = TypeVar('BatchT')
 # TODO
 # 1. implement metrics
 # 2. gradient accumulating
-# 3. save / load
-# 4. checkpoints
-# 5. logging
-# 6. scheduler
+# 3. checkpoints
+# 4. scheduler
 class Distiller:
     """Base class for distiller.
 
