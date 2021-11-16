@@ -23,7 +23,6 @@ setup(
     packages=['squeezer'],
     url='https://github.com/esceptico/squeezer',
     license='MIT',
-    author='a18282463',
     author_email='ganiev.tmr@gmail.com',
     description='Lightweight knowledge distillation pipeline',
     install_requires=parse_requirements(REQUIREMENTS_PATH)
