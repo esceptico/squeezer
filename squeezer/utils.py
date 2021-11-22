@@ -12,7 +12,7 @@ def move_to_device(obj: Any, device: Union[str, torch.device]):
         device: Device to move object to.
 
     Returns:
-        Moved to given device object
+        Moved object
 
     Raises:
         ValueError: If the object cannot be moved to the device.
