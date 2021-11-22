@@ -90,7 +90,7 @@ class Distiller:
             >>> def teacher_forward(self, batch):
             >>>     return self.teacher(**batch)
         """
-        raise NotImplementedError
+        return self.teacher(**batch)
 
     def student_forward(self, batch):
         """Implements student forward on given batch.
@@ -105,7 +105,7 @@ class Distiller:
             >>> def teacher_forward(self, batch):
             >>>     return self.student(**batch)
         """
-        raise NotImplementedError
+        return self.student(**batch)
 
     def _train(self, loader: DataLoader, epoch: int, accumulation_steps: int = 1):
         self.student.train()
@@ -142,7 +142,7 @@ class Distiller:
         loss_dict = {f'Train/{k}': v for k, v in average.compute().items()}
         self.logger.log_dict(loss_dict, step=epoch)
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def _validate(self, loader: DataLoader, epoch: int):
         self.student.train()
 
