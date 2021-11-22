@@ -18,9 +18,7 @@ BatchT = TypeVar('BatchT')
 
 # TODO
 # 1. implement metrics
-# 2. gradient accumulating
-# 3. checkpoints
-# 4. scheduler
+# 2. checkpoints
 class Distiller:
     """Base class for distiller.
 
@@ -34,6 +32,7 @@ class Distiller:
         student: nn.Module,
         loss_policy: AbstractDistillationPolicy,
         optimizer: torch.optim.Optimizer,
+        scheduler: Optional,
         device: Union[str, torch.device] = 'cpu',
         log_dir: str = 'runs',
         name: Optional[str] = None
@@ -44,6 +43,7 @@ class Distiller:
             teacher: Teacher model.
             student: Student model.
             optimizer: Optimizer.
+            scheduler: Learning Rate scheduler. Defaults to None.
             loss_policy: Distillation loss policy.
             device: Device to which you want to move data and models.
                 Defaults to cpu.
@@ -55,6 +55,7 @@ class Distiller:
         self.student = student.to(device)
         self.loss_policy = loss_policy
         self.optimizer = optimizer
+        self.scheduler = scheduler
 
         self.log_dir = log_dir
         self.name = name
@@ -106,17 +107,17 @@ class Distiller:
         """
         raise NotImplementedError
 
-    def _train(self, loader: DataLoader, epoch: int):
+    def _train(self, loader: DataLoader, epoch: int, accumulation_steps: int = 1):
         self.student.train()
 
         loss_average = Average()
         average = DictAverage()
 
+        last_batch_index = len(loader) - 1
         bar_desc = f'[{epoch}th epoch]'
         loader_bar = tqdm(loader, desc=bar_desc, leave=True, file=sys.stdout)
         for i, batch in enumerate(loader_bar):
             batch = self.move_batch_to_device(batch)
-            self.optimizer.zero_grad()
             with torch.no_grad():
                 teacher_output = self.teacher_forward(batch)
             student_output = self.student_forward(batch)
@@ -126,7 +127,13 @@ class Distiller:
                 batch=batch,
                 epoch=epoch
             )
+            batch_loss = batch_loss / accumulation_steps
             batch_loss.backward()
+            if (i + 1) % accumulation_steps == 0 or i == last_batch_index:
+                self.optimizer.step()
+                if self.scheduler is not None:
+                    self.scheduler.step()
+                self.optimizer.zero_grad()
             self.optimizer.step()
 
             loss_average.update(batch_loss.item())
