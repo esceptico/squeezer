@@ -32,7 +32,7 @@ class Distiller:
         student: nn.Module,
         loss_policy: AbstractDistillationPolicy,
         optimizer: torch.optim.Optimizer,
-        scheduler: Optional,
+        scheduler: Optional = None,
         device: Union[str, torch.device] = 'cpu',
         log_dir: str = 'runs',
         name: Optional[str] = None
@@ -69,8 +69,9 @@ class Distiller:
                 self._train(train_loader, epoch)
                 if val_loader is not None:
                     self._validate(val_loader, epoch)
-            except InterruptedError:
+            except KeyboardInterrupt:
                 print('Keyboard interrupt...')
+                return
             finally:
                 self.logger.dispose()
 
