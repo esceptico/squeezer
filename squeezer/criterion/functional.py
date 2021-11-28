@@ -71,4 +71,3 @@ def cosine_loss(x1: Tensor, x2: Tensor) -> Tensor:
     distance = 1 - func.cosine_similarity(x1, x2, dim=-1)
     mean_distance = distance.mean()
     return mean_distance
-

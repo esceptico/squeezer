@@ -1,16 +1,16 @@
-import os
 import sys
-from typing import Optional, TypeVar, Union
+from typing import List, Optional, TypeVar, Union
 
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from squeezer.logging import TensorboardLogger
+from squeezer.logging.abstract import AbstractLogger
+from squeezer.logging.stub import StubLogger
 from squeezer.policy import AbstractDistillationPolicy
 from squeezer.reduce import Average, DictAverage
-from squeezer.utils import move_to_device, save_weights
+from squeezer.utils import move_to_device
 
 
 BatchT = TypeVar('BatchT')
@@ -24,31 +24,36 @@ class Distiller:
 
     Notes:
         You must implement teacher_forward and student_forward methods
-        in the child class.
+        in the child class. By default those methods define as:
+        >>> def teacher_forward(self, batch):
+        >>>     return self.teacher(**batch)
+
+        >>> def student_forward(self, batch):
+        >>>     return self.student(**batch)
+
     """
     def __init__(
         self,
-        teacher: nn.Module,
+        teacher: Union[nn.Module, List[nn.Module]],
         student: nn.Module,
         loss_policy: AbstractDistillationPolicy,
         optimizer: torch.optim.Optimizer,
         scheduler: Optional = None,
         device: Union[str, torch.device] = 'cpu',
-        log_dir: str = 'runs',
-        name: Optional[str] = None
+        logger: Optional[AbstractLogger] = None
     ):
         """Constructor.
 
         Args:
-            teacher: Teacher model.
+            teacher: Teacher model or list of models.
             student: Student model.
             optimizer: Optimizer.
             scheduler: Learning Rate scheduler. Defaults to None.
             loss_policy: Distillation loss policy.
             device: Device to which you want to move data and models.
                 Defaults to cpu.
-            log_dir: Path to save logs.
-            name: Experiment name.
+            logger: Instance of AbstractLogger class. If None, will be replaced to stub logger.
+                Defaults to None.
         """
         self.device = device
         self.teacher = teacher.to(device)
@@ -57,9 +62,7 @@ class Distiller:
         self.optimizer = optimizer
         self.scheduler = scheduler
 
-        self.log_dir = log_dir
-        self.name = name
-        self.logger = TensorboardLogger(self.log_dir, self.name)
+        self.logger = StubLogger() if logger is None else logger
 
     def __call__(self, train_loader: DataLoader, val_loader: Optional[DataLoader] = None, n_epochs: int = 10):
         self.teacher.eval()
@@ -91,7 +94,7 @@ class Distiller:
             >>> def teacher_forward(self, batch):
             >>>     return self.teacher(**batch)
         """
-        return self.teacher(**batch)
+        raise NotImplementedError
 
     def student_forward(self, batch):
         """Implements student forward on given batch.
@@ -103,10 +106,10 @@ class Distiller:
             Required student output.
 
         Examples:
-            >>> def teacher_forward(self, batch):
+            >>> def student_forward(self, batch):
             >>>     return self.student(**batch)
         """
-        return self.student(**batch)
+        raise NotImplementedError
 
     def _train(self, loader: DataLoader, epoch: int, accumulation_steps: int = 1):
         self.student.train()
@@ -166,21 +169,3 @@ class Distiller:
             loader_bar.set_postfix({'loss': loss_average.compute()})
         loss_dict = {f'Val/{k}': v for k, v in average.compute().items()}
         self.logger.log_dict(loss_dict, step=epoch)
-
-    def save(self, save_path: str):
-        """Saves weights (student, optimizer and loss policy) to the given directory."""
-        save_weights(self.student, os.path.join(save_path, 'student.pth'))
-        save_weights(self.optimizer, os.path.join(save_path, 'optimizer.pth'))
-        save_weights(self.loss_policy, os.path.join(save_path, 'loss_policy.pth'))
-
-    def load(self, load_path: str, device: Union[str, torch.device] = 'cpu'):
-        """Loads weights (student, optimizer and loss policy if exists) from the given directory."""
-        paths = [
-            (self.student, os.path.join(load_path, 'student.pth')),
-            (self.optimizer, os.path.join(load_path, 'optimizer.pth')),
-            (self.loss_policy, os.path.join(load_path, 'loss_policy.pth'))
-        ]
-        for module, path in paths:
-            if os.path.exists(path):
-                parameters = torch.load(path, device)
-                module.load_state_dict(parameters)

@@ -5,11 +5,12 @@ from typing import Dict, Optional
 
 from torch.utils.tensorboard import SummaryWriter
 
+from squeezer.logging.abstract import AbstractLogger
 
 logger = getLogger(__name__)
 
 
-class TensorboardLogger:
+class TensorboardLogger(AbstractLogger):
     """TensorBoard logger."""
     def __init__(self, log_dir: str, name: str):
         self.log_dir = log_dir

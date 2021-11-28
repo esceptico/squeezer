@@ -19,7 +19,7 @@ def parse_requirements(path: str):
 
 setup(
     name='squeezer',
-    version='0.0.1',
+    version='0.1.0',
     packages=['squeezer'],
     url='https://github.com/esceptico/squeezer',
     license='MIT',

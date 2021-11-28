@@ -33,15 +33,18 @@ class DistillationPolicy(AbstractDistillationPolicy):
 ```python
 from torch import optim
 
+from squeezer.logging import TensorboardLogger
+
 
 train_loader = ...
 
 teacher = Teacher()
 student = Student()
 
+logger = TensorboardLogger('runs', 'experiment')
 optimizer = optim.AdamW(student.parameters(), lr=3e-4)
 policy = DistillationPolicy()
-distiller = CustomDistiller(teacher, student, policy, optimizer=optimizer)
+distiller = CustomDistiller(teacher, student, policy, optimizer=optimizer, logger=logger)
 
 distiller(train_loader, n_epochs=10)
 distiller.save('path_to_some_directory')
