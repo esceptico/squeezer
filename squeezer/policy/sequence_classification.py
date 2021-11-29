@@ -7,6 +7,7 @@ from squeezer.policy.abstract import AbstractDistillationPolicy, ValuesDictT
 
 
 class BertForSequenceClassificationPolicy(AbstractDistillationPolicy):
+    """Loss policy for BertForSequenceClassification model."""
     def __init__(self, alpha: float = 0.5, temperature: float = 2):
         super().__init__()
         self.alpha = alpha
